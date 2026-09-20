@@ -39,7 +39,7 @@ jobs:
           SALESMATE_SECRET_KEY: ${{ secrets.SALESMATE_SECRET_KEY }}
         run: |
           echo "Starting Salesmate sync at $(date -u)"
-          node salesmate_fetch.js
+          node salesmate_client.js
           echo "Sync completed at $(date -u)"
 
       - name: List generated files
