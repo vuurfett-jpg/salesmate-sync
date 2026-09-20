@@ -1,78 +1,63 @@
 const https = require('https');
 const fs = require('fs');
 
-const accessKey = process.env.SALESMATE_ACCESS_KEY;
-const secretKey = process.env.SALESMATE_SECRET_KEY;
-const instanceUrl = 'visionsalesgroup.salesmate.io';
+const SALESMATE_URL = 'https://visionsalesgroup.salesmate.io/api/v1/companies';
+const ACCESS_KEY = process.env.SALESMATE_ACCESS_KEY;
+const SECRET_KEY = process.env.SALESMATE_SECRET_KEY;
 
-function makeRequest(path, method = 'GET', body = null) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: instanceUrl,
-      path: path,
-      method: method,
-      headers: {
-        'Authorization': `Bearer ${accessKey}:${secretKey}`,
-        'Content-Type': 'application/json'
-      }
-    };
+// Create Basic Auth header
+const credentials = Buffer.from(`${ACCESS_KEY}:${SECRET_KEY}`).toString('base64');
 
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          resolve(data);
-        }
-      });
-    });
-
-    req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
-}
-
-async function fetchAllCompanies() {
+async function fetchCompanies() {
   let allCompanies = [];
   let page = 1;
   let hasMore = true;
 
   while (hasMore) {
+    console.log(`Fetching page ${page}...`);
+    
     try {
-      const response = await makeRequest(`/api/v3/companies?page=${page}&rows=500`);
-      if (response.data && Array.isArray(response.data)) {
-        allCompanies = allCompanies.concat(response.data);
+      const data = await new Promise((resolve, reject) => {
+        const options = {
+          headers: {
+            'Authorization': `Basic ${credentials}`,
+            'Content-Type': 'application/json'
+          }
+        };
+
+        https.get(`${SALESMATE_URL}?page=${page}`, options, (res) => {
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => {
+            if (res.statusCode !== 200) {
+              console.error(`API Error: ${res.statusCode} ${body}`);
+              reject(new Error(`API returned ${res.statusCode}`));
+              return;
+            }
+            resolve(JSON.parse(body));
+          });
+        }).on('error', reject);
+      });
+
+      if (data.companies && data.companies.length > 0) {
+        allCompanies = allCompanies.concat(data.companies);
+        console.log(`Got ${data.companies.length} companies on page ${page}. Total so far: ${allCompanies.length}`);
+        hasMore = !!data.next_page_url;
         page++;
-        hasMore = response.data.length === 500;
       } else {
         hasMore = false;
+        console.log('No more companies found.');
       }
-    } catch (error) {
-      console.error(`Error fetching page ${page}:`, error);
+    } catch (err) {
+      console.error(`Error fetching page ${page}:`, err.message);
       hasMore = false;
     }
   }
 
-  return allCompanies;
+  // Write to file
+  const filename = `salesmate_companies_${new Date().toISOString().split('T')[0]}.json`;
+  fs.writeFileSync(filename, JSON.stringify(allCompanies, null, 2));
+  console.log(`Saved ${allCompanies.length} companies to ${filename}`);
 }
 
-async function run() {
-  try {
-    console.log('Fetching all Salesmate companies...');
-    const companies = await fetchAllCompanies();
-    
-    const date = new Date().toISOString().split('T')[0];
-    const filename = `salesmate_companies_${date}.json`;
-    
-    fs.writeFileSync(filename, JSON.stringify(companies, null, 2));
-    console.log(`Saved ${companies.length} companies to ${filename}`);
-  } catch (error) {
-    console.error('Failed to fetch companies:', error);
-    process.exit(1);
-  }
-}
-
-run();
+fetchCompanies();
