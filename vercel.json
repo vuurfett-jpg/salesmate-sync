@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/**/*.js": {
+      "memory": 512,
+      "maxDuration": 60
+    }
+  },
+  "env": [
+    "SALESMATE_ACCESS_KEY",
+    "SALESMATE_SECRET_KEY"
+  ]
+}
