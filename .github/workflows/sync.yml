@@ -1,7 +1,7 @@
-name: Sync Salesmate Companies Daily
-
+name: Salesmate Data Sync
 on:
   schedule:
+    # 6 AM UTC daily
     - cron: '0 6 * * *'
   workflow_dispatch:
 
@@ -10,24 +10,62 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Node.js
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      
+
+      - name: Verify credentials
+        run: |
+          if [ -z "${{ secrets.SALESMATE_ACCESS_KEY }}" ]; then
+            echo "❌ ERROR: SALESMATE_ACCESS_KEY not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SALESMATE_SECRET_KEY }}" ]; then
+            echo "❌ ERROR: SALESMATE_SECRET_KEY not set"
+            exit 1
+          fi
+          echo "✅ Credentials verified"
+
       - name: Run Salesmate sync
         env:
+          SALESMATE_INSTANCE: visionsalesgroup.salesmate.io
           SALESMATE_ACCESS_KEY: ${{ secrets.SALESMATE_ACCESS_KEY }}
           SALESMATE_SECRET_KEY: ${{ secrets.SALESMATE_SECRET_KEY }}
-        run: node salesmate_fetch.js
-      
+        run: |
+          echo "Starting Salesmate sync at $(date -u)"
+          node salesmate_fetch.js
+          echo "Sync completed at $(date -u)"
+
+      - name: List generated files
+        if: always()
+        run: ls -lah salesmate_*.* 2>/dev/null || echo "No output files found"
+
       - name: Commit and push
+        if: success()
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add salesmate_companies_*.json
-          git commit -m "Sync Salesmate $(date +%Y-%m-%d)" || true
+          git add salesmate_accounts_*.json salesmate_accounts_*.csv
+          git commit -m "Sync Salesmate data $(date -u +%Y-%m-%d)" || echo "No changes to commit"
           git push
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: salesmate-sync-output
+          path: salesmate_accounts_*.*
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Salesmate sync FAILED"
+          echo "Check the logs above for details"
+          exit 1
