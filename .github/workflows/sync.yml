@@ -8,11 +8,13 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
       
@@ -27,5 +29,5 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add salesmate_companies_*.json
-          git commit -m "Sync Salesmate companies $(date +%Y-%m-%d)" || echo "No changes"
+          git commit -m "Sync Salesmate $(date +%Y-%m-%d)" || true
           git push
