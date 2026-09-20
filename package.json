@@ -1,0 +1,13 @@
+{
+  "name": "salesmate-sync",
+  "version": "1.0.0",
+  "description": "Fetch Salesmate accounts from phone",
+  "main": "api/salesmate-fetch.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["salesmate", "api"],
+  "author": "Garrett",
+  "license": "MIT"
+}
